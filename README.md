@@ -14,3 +14,5 @@ Instructions:
 Result: BOOT size increased from 32mb to 96mb.
 
 The preloader will be flashed with version 1024
+
+Updated script will now work in orange fox
