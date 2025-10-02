@@ -1,113 +1,181 @@
 #!/sbin/sh
 
-# Экран дисплея
-SCREEN=/proc/self/fd/$2
+#-----------------------------------------------------------------------
+# Назначение: Переразметка раздела boot с бэкапом GPT через ZIP в Recovery
+# Версия: 1.3
+# Автор: isus203
+# Дата создания: 29.07.2024г
+# Дата обновление: 02.10.2025г
+#-----------------------------------------------------------------------
 
-# Текущий установщик zip
+
+# Аргументы update-binary
+OUTFD="/proc/self/fd/$2"
 ZIPFILE="$3"
 
-# Пути к устройствам и файлам
-device="/dev/block/mmcblk0"
-sgdisk="/tmp/sgdisk"
-boot="/tmp/boot.img"
-preloader="/tmp/preloader_kh7n_h6919.bin"
+# Пути к устройству и временным файлам
+DEVICE="/dev/block/mmcblk0"
+SGDISK="/tmp/sgdisk"
+BOOT_IMG="/tmp/boot.img"
+LOGFILE="/tmp/repartition.log"
+GPT_SDCARD="/sdcard/gpt_backup.bin"
+BACKUP_ZIP="/sdcard/gpt_partition_backup_$(date '+%Y%m%d_%H%M%S').zip"
+BACKUP_DIR="/tmp/backup"
+GPT_BACKUP_ZIP="/tmp/backup/gpt_partition_backup_$(date '+%Y%m%d_%H%M%S').zip"
 
-# Вывод сообщений 
+
+# Вывод сообщений в Recovery UI + лог
 ui_print() {
-echo -e "ui_print $1\nui_print" >> $SCREEN
+    echo -e "ui_print $1\nui_print" >> "$OUTFD"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOGFILE"
 }
 
-# Отображение 
-display() {
-ui_print " "
-ui_print "=========================================="
-ui_print "         Repartitioning partitions        "
-ui_print "                 By isus203               "
-ui_print "=========================================="
-ui_print " "
+# Баннер
+display_banner() {
+    ui_print ""
+    ui_print "=========================================="
+    ui_print "     Repartition Boot + GPT Backup installer"
+    ui_print "                By isus203 (v1.3)              "
+    ui_print "=========================================="
+    ui_print ""
 }
 
-# Функция проверки ошибок
-check_error() {
+# Распаковка ZIP в /tmp
+extract_package() {
+    ui_print "Unpacking the archive..."
+    mkdir -p /tmp
+    unzip -o "$ZIPFILE" -d /tmp >> "$LOGFILE" 2>&1
     if [ $? -ne 0 ]; then
-        ui_print " "
-        ui_print "Error: command failed with exit code $?"
-        ui_print " "
+        ui_print "Unpacking error!"
         exit 1
     fi
 }
 
-# Проверка директории и распаковка
-directory_check() {
-    if [ -e /tmp ]; then
-        ui_print " "
-        ui_print "Unpacking archive"
-        unzip -o "$ZIPFILE" -d /tmp
-        check_error
+# Проверка наличия необходимых файлов
+check_files() {
+    for f in "$SGDISK" "$BOOT_IMG" "$PRELOADER_BIN"; do
+        if [ ! -f "$f" ]; then
+            ui_print "File not found: $f"
+            exit 1
+        fi
+    done
+}
+
+# Права
+set_permissions() {
+    ui_print "Issuance of rights..."
+    chmod 755 "$SGDISK"
+    chmod 644 "$BOOT_IMG"
+}
+
+# Бэкап GPT
+backup_gpt() {
+    ui_print "Creating a backup GPT..."
+    "$SGDISK" -b "$BACKUP_DIR" "$DEVICE"
+    if [ $? -ne 0 ]; then
+        ui_print "Backup error GPT!"
+        exit 1
+    fi
+    
+    # Копируем Sgdisk/backup GPT
+    cp "$SGDISK" "$BACKUP_DIR" 2>/dev/null  
+    dd if=/dev/block/by-name/boot_a of="$BACKUP_DIR/boot_a.img" bs=4M >> "$LOGFILE" 2>&1
+    if [ $? -eq 0 ]; then
+        ui_print "GPT backup saved: $BACKUP_DIR"
     else
-        ui_print " "
-        ui_print "Creating a directory and unpacking the archive" 
-        mkdir -p /tmp
-        unzip -o "$ZIPFILE" -d /tmp
-        check_error
+        ui_print "Failed to save backup to $BACKUP_DIR"
     fi
-}
-
-# Проверяем существование файлов
-checking_package_existence() {
-    if [ ! -e /tmp/* ]; then
-        ui_print " "
-        ui_print "Packages in /tmp not found. Make sure the files are in the /tmp directory."
-        check_error
+    
+    # Копируем на SD-карту
+    cp "$BACKUP_DIR" "$GPT_SDCARD" 2>/dev/null
+    if [ $? -eq 0 ]; then
+        ui_print "GPT backup saved: $GPT_SDCARD"
+    else
+        ui_print "Failed to save backup to SD card, but it is in /tmp"
     fi
+     
+# Скрипт восстановления
+mkdir -p "$BACKUP_DIR/META-INF/com/google/android"
+cat > "$BACKUP_DIR/META-INF/com/google/android/update-binary" << 'EOF'
+#!/sbin/sh
+OUTFD="/proc/self/fd/$2"
+DEVICE="/dev/block/mmcblk0"
+SGDISK="/tmp/sgdisk"
+BOOT_IMG="/tmp/boot_a.img"
+
+ui_print() {
+    echo -e "ui_print $1\nui_print" >> "$OUTFD"
 }
 
-# Выдача разрешений
-issuance_of_permits() {
-    ui_print " "
-    ui_print "Issuance of permits"
-    chmod 777 $sgdisk
-    chmod 777 $boot
-    chmod 777 $preloader
-    ui_print " "
+ui_print ""
+ui_print "=========================================="
+ui_print "         GPT Backup installer      "
+ui_print "              By isus203                "
+ui_print "=========================================="
+ui_print ""
+
+ui_print "GPT and partition recovery..."
+mkdir -p /tmp
+unzip -o "$3" -d /tmp
+
+ui_print "Issuance of rights..."
+chmod 755 "$SGDISK"
+chmod 644 "$BOOT_IMG"
+
+"$SGDISK" -l /tmp/gpt_backup.bin "$DEVICE"
+dd if=/tmp/boot_a.img of=/dev/block/by-name/boot_a bs=4M
+dd if=/tmp/boot_a.img of=/dev/block/by-name/boot_b bs=4M
+ui_print "Recovery complete"
+exit 0
+EOF
+    chmod +x "$BACKUP_DIR/META-INF/com/google/android/update-binary"
+
+cat > "$BACKUP_DIR/META-INF/com/google/android/update-script" << 'EOF'
+# Dummy file; update-binary is a shell script.
+EOF
+
+chmod +x "$BACKUP_DIR/META-INF/com/google/android/update-script"
+
+    # Архивация
+    ui_print "Backup archiving..."
+    (cd "$BACKUP_DIR" && zip -r "$BACKUP_ZIP" .) >> "$LOGFILE" 2>&1
+    ui_print "The backup has been saved.: $BACKUP_ZIP"
+    
+    (cd "$BACKUP_DIR" && zip -r "$GPT_BACKUP_ZIP" .) >> "$LOGFILE" 2>&1
+    ui_print "The backup has been saved.: $GPT_BACKUP_ZIP"
 }
 
-# Переразметка
-re-markup() {
-    ui_print "Repartition boot"
-    $sgdisk $device -d 30 -d 31 -n 30:1003520:1200127 -c 30:boot_a -t 30:0700
-    check_error
-    $sgdisk $device -d 43 -d 44 -n 43:1708032:1904639 -c 43:boot_b -t 43:0700
-    check_error
-    $sgdisk $device -s
-    check_error
-    ui_print " "
-    ui_print "Re-marking is finished"
+# Переразметка boot
+repartition_boot() {
+    ui_print "Re-marking boot..."
+    "$SGDISK" "$DEVICE" -d 30 -d 31 -n 30:1003520:1200127 -c 30:boot_a -t 30:0700
+    if [ $? -ne 0 ]; then exit 1; fi
+    "$SGDISK" "$DEVICE" -d 43 -d 44 -n 43:1708032:1904639 -c 43:boot_b -t 43:0700
+    if [ $? -ne 0 ]; then exit 1; fi
+    "$SGDISK" "$DEVICE" -s
+    if [ $? -ne 0 ]; then exit 1; fi
+    ui_print "Re-marking is complete."
 }
 
-# Прошивание
-firmware() {
-    ui_print " "
-    ui_print "Flashing preloader"
-    dd if="$preloader" of="/dev/block/by-name/preloader_a"
-    check_error
-    dd if="$preloader" of="/dev/block/by-name/preloader_b"
-    check_error
-    ui_print " "
-    ui_print "Flashing boot"
-    dd if="$boot" of="/dev/block/by-name/boot_a"
-    check_error
-    dd if="$boot" of="/dev/block/by-name/boot_b"
-    check_error
-    ui_print " "
-    ui_print "Firmware is complete"
-    ui_print " "
+# Прошивка preloader и boot
+flash_firmware() {
+    ui_print "Firmware boot..."
+    dd if="$BOOT_IMG" of="/dev/block/by-name/boot_a" bs=4M >> "$LOGFILE" 2>&1
+    if [ $? -ne 0 ]; then exit 1; fi
+    dd if="$BOOT_IMG" of="/dev/block/by-name/boot_b" bs=4M >> "$LOGFILE" 2>&1
+    if [ $? -ne 0 ]; then exit 1; fi
+
+    ui_print "The firmware is complete."
 }
 
-ui_print
-display
-directory_check
-checking_package_existence
-issuance_of_permits
-re-markup
-firmware
+# Запуск
+ui_print ""
+display_banner
+extract_package
+check_files
+set_permissions
+backup_gpt
+repartition_boot
+flash_firmware
+
+ui_print "The operation was completed successfully."
