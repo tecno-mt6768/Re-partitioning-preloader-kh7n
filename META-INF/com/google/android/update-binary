@@ -17,11 +17,11 @@ ZIPFILE="$3"
 DEVICE="/dev/block/mmcblk0"
 SGDISK="/tmp/sgdisk"
 BOOT_IMG="/tmp/boot.img"
+PRELOADER_BIN="/tmp/preloader_kh7n_h6919.bin"
 LOGFILE="/tmp/repartition.log"
-GPT_SDCARD="/sdcard/gpt_backup.bin"
+GPT_SDCARD="/sdcard/gpt_backup_$(date '+%Y%m%d_%H%M%S').bin"
 BACKUP_ZIP="/sdcard/gpt_partition_backup_$(date '+%Y%m%d_%H%M%S').zip"
 BACKUP_DIR="/tmp/backup"
-GPT_BACKUP_ZIP="/tmp/backup/gpt_partition_backup_$(date '+%Y%m%d_%H%M%S').zip"
 
 
 # Вывод сообщений в Recovery UI + лог
@@ -65,7 +65,7 @@ check_files() {
 set_permissions() {
     ui_print "Issuance of rights..."
     chmod 755 "$SGDISK"
-    chmod 644 "$BOOT_IMG"
+    chmod 644 "$BOOT_IMG" "$PRELOADER_BIN"
 }
 
 # Бэкап GPT
@@ -78,7 +78,7 @@ backup_gpt() {
     fi
     
     # Копируем Sgdisk/backup GPT
-    cp "$SGDISK" "$BACKUP_DIR" 2>/dev/null  
+    cp "$SGDISK" "$BACKUP_DIR" 2>/dev/null
     dd if=/dev/block/by-name/boot_a of="$BACKUP_DIR/boot_a.img" bs=4M >> "$LOGFILE" 2>&1
     if [ $? -eq 0 ]; then
         ui_print "GPT backup saved: $BACKUP_DIR"
@@ -140,9 +140,6 @@ chmod +x "$BACKUP_DIR/META-INF/com/google/android/update-script"
     ui_print "Backup archiving..."
     (cd "$BACKUP_DIR" && zip -r "$BACKUP_ZIP" .) >> "$LOGFILE" 2>&1
     ui_print "The backup has been saved.: $BACKUP_ZIP"
-    
-    (cd "$BACKUP_DIR" && zip -r "$GPT_BACKUP_ZIP" .) >> "$LOGFILE" 2>&1
-    ui_print "The backup has been saved.: $GPT_BACKUP_ZIP"
 }
 
 # Переразметка boot
@@ -159,6 +156,12 @@ repartition_boot() {
 
 # Прошивка preloader и boot
 flash_firmware() {
+    ui_print "Firmware preloader..."
+    dd if="$PRELOADER_BIN" of="/dev/block/by-name/preloader_a" bs=4M >> "$LOGFILE" 2>&1
+    if [ $? -ne 0 ]; then exit 1; fi
+    dd if="$PRELOADER_BIN" of="/dev/block/by-name/preloader_b" bs=4M >> "$LOGFILE" 2>&1
+    if [ $? -ne 0 ]; then exit 1; fi
+
     ui_print "Firmware boot..."
     dd if="$BOOT_IMG" of="/dev/block/by-name/boot_a" bs=4M >> "$LOGFILE" 2>&1
     if [ $? -ne 0 ]; then exit 1; fi
