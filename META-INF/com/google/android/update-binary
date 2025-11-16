@@ -5,7 +5,7 @@
 # Версия: 1.3
 # Автор: isus203
 # Дата создания: 29.07.2024г
-# Дата обновление: 02.10.2025г
+# Дата обновление: 15.11.2025г
 #-----------------------------------------------------------------------
 
 
@@ -18,11 +18,11 @@ DEVICE="/dev/block/mmcblk0"
 SGDISK="/tmp/sgdisk"
 BOOT_IMG="/tmp/boot.img"
 PRELOADER_BIN="/tmp/preloader_kh7n_h6919.bin"
-LOGFILE="/tmp/repartition.log"
-GPT_SDCARD="/sdcard/gpt_backup_$(date '+%Y%m%d_%H%M%S').bin"
-BACKUP_ZIP="/sdcard/gpt_partition_backup_$(date '+%Y%m%d_%H%M%S').zip"
+LOGFILE="/external_sd/repartition.log"
+GPT_SDCARD="/external_sd/gpt_backup.bin"
 BACKUP_DIR="/tmp/backup"
-
+BACKUP_GPT="/tmp/backup/gpt_backup.bin"
+BACKUP_ZIP="/external_sd/gpt_partition_backup_$(date '+%Y%m%d_%H%M%S').zip"
 
 # Вывод сообщений в Recovery UI + лог
 ui_print() {
@@ -44,7 +44,8 @@ display_banner() {
 extract_package() {
     ui_print "Unpacking the archive..."
     mkdir -p /tmp
-    unzip -o "$ZIPFILE" -d /tmp >> "$LOGFILE" 2>&1
+    mkdir -p /tmp/backup
+    unzip -o "$ZIPFILE" -d /tmp
     if [ $? -ne 0 ]; then
         ui_print "Unpacking error!"
         exit 1
@@ -65,13 +66,14 @@ check_files() {
 set_permissions() {
     ui_print "Issuance of rights..."
     chmod 755 "$SGDISK"
-    chmod 644 "$BOOT_IMG" "$PRELOADER_BIN"
+    chmod 644 "$BOOT_IMG" 
+    chmod 644 "$PRELOADER_BIN"
 }
 
 # Бэкап GPT
 backup_gpt() {
     ui_print "Creating a backup GPT..."
-    "$SGDISK" -b "$BACKUP_DIR" "$DEVICE"
+    "$SGDISK" -b "$BACKUP_GPT" "$DEVICE"
     if [ $? -ne 0 ]; then
         ui_print "Backup error GPT!"
         exit 1
@@ -87,7 +89,7 @@ backup_gpt() {
     fi
     
     # Копируем на SD-карту
-    cp "$BACKUP_DIR" "$GPT_SDCARD" 2>/dev/null
+    cp "$BACKUP_GPT" "$GPT_SDCARD" 2>/dev/null
     if [ $? -eq 0 ]; then
         ui_print "GPT backup saved: $GPT_SDCARD"
     else
@@ -123,8 +125,8 @@ chmod 755 "$SGDISK"
 chmod 644 "$BOOT_IMG"
 
 "$SGDISK" -l /tmp/gpt_backup.bin "$DEVICE"
-dd if=/tmp/boot_a.img of=/dev/block/by-name/boot_a bs=4M
-dd if=/tmp/boot_a.img of=/dev/block/by-name/boot_b bs=4M
+dd if=/tmp/boot_a.img of=/dev/block/by-name/boot_a
+dd if=/tmp/boot_a.img of=/dev/block/by-name/boot_b
 ui_print "Recovery complete"
 exit 0
 EOF
@@ -157,15 +159,15 @@ repartition_boot() {
 # Прошивка preloader и boot
 flash_firmware() {
     ui_print "Firmware preloader..."
-    dd if="$PRELOADER_BIN" of="/dev/block/by-name/preloader_a" bs=4M >> "$LOGFILE" 2>&1
+    dd if="$PRELOADER_BIN" of="/dev/block/by-name/preloader_a" >> "$LOGFILE" 2>&1
     if [ $? -ne 0 ]; then exit 1; fi
-    dd if="$PRELOADER_BIN" of="/dev/block/by-name/preloader_b" bs=4M >> "$LOGFILE" 2>&1
+    dd if="$PRELOADER_BIN" of="/dev/block/by-name/preloader_b" >> "$LOGFILE" 2>&1
     if [ $? -ne 0 ]; then exit 1; fi
 
     ui_print "Firmware boot..."
-    dd if="$BOOT_IMG" of="/dev/block/by-name/boot_a" bs=4M >> "$LOGFILE" 2>&1
+    dd if="$BOOT_IMG" of="/dev/block/by-name/boot_a" >> "$LOGFILE" 2>&1
     if [ $? -ne 0 ]; then exit 1; fi
-    dd if="$BOOT_IMG" of="/dev/block/by-name/boot_b" bs=4M >> "$LOGFILE" 2>&1
+    dd if="$BOOT_IMG" of="/dev/block/by-name/boot_b" >> "$LOGFILE" 2>&1
     if [ $? -ne 0 ]; then exit 1; fi
 
     ui_print "The firmware is complete."
