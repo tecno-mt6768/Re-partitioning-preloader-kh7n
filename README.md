@@ -1,37 +1,83 @@
-# INCREASE BOOT SIZE TO 96MB
-What it does: Increases the size of the BOOT partition from 32 MB to 96 MB.
+# Increase BOOT Partition Size to 96MB
 
-This can be useful for installing custom recovery or other modifications.
-Important: Before you begin, make sure you have a backup of important data. Incorrectly following the instructions can damage your device.
+Overview
+This guide explains how to increase the BOOT partition size from 32MB to 96MB. This is often necessary for installing large custom recoveries or other modifications.
+> [!WARNING]
+> IMPORTANT: Before you begin, ensure you have a complete backup of all important data. Incorrectly following these instructions can lead to a bricked device or data loss. Proceed at your own risk.
+> 
+Prerequisites
+ * You must already have a custom recovery (TWRP or OrangeFox) installed.
+ * You must know how to use SP Flash Tool to recover your phone in case of a hard brick. This guide will not save you if you don't have a full backup and knowledge of SP Flash Tool.
+ * You must have an external SD card.
+<details>
+<summary>Click to expand: Instructions for Re-partitioning</summary>
 
-Step 1: Downloading the archive
-* Download the archive with the necessary files.
-* Save the archive in a convenient location on your phone or SD card.
+  Step 1: Download the Archive
+ * Download the correct archive for your firmware version (see the Downloads section below).
+ * Save the archive to a convenient location on your external SD card.
+> [!NOTE]
+> An external SD card is mandatory. The partition backup and logs will not be saved without it.
+> 
 
-Step 2: Boot into TWRP Recovery mode
-* Turn off your phone.
-* Boot it into TWRP Recovery mode by holding down the power button and volume up.
+Step 2: Boot into TWRP Recovery
+ * Turn off your phone completely.
+ * Boot into TWRP Recovery (usually by holding Power + Volume Up).
 
-Step 3: Flashing the archive
-* In TWRP, find the downloaded archive.
-* Select the archive and install it.
-* Wait for the flashing process to complete.
+Step 3: Flash the Archive
+ * In TWRP, tap "Install."
+ * Navigate to your external SD card and find the downloaded archive.
+ * Select the archive and "Swipe to confirm Flash."
+ * Wait for the flashing process to complete.
 
-Step 4: Reboot the system
-* After successful flashing, reboot your device.
-* Select the "Reboot system" option in TWRP.
+Step 4: Reboot System
+ * After the flash is successful, go back to the main menu.
+ * Select "Reboot," then "System."
 
-Step 5: Check the result
-* After rebooting, check if the BOOT partition size has increased via termux or via recovery.
+Step 5: Verify the Result
+After your device reboots, you can verify that the BOOT partition size has increased. You can check this using a terminal app (like Termux) or by booting back into recovery and checking the partition info.
+</details>
+<details>
+<summary>Click to expand: How to Restore Original Partitions</summary>
+The re-partitioning script automatically creates a backup of your original partition table. Use this to restore your device if needed.
 
-Additional information:
-* The archive also contains the "Orange Fox" recovery, which can be used to install a full recovery, and the archive also supports installation in Orange Fox, the recovery can be taken from the archive.
-Thanks:
-* Thanks to alekseystarikov for testing the archive.
-Important notes:
-* This instruction assumes that you already have TWRP Recovery or Orange Fox installed. If not, you need to install it first.
-* Be careful when following the instructions to avoid damaging your device.
-* If you are not sure of your actions, it is better to seek help from a more experienced user.
-* You also need to be able to use the SP flash tool to restore the phone and markup.
+  Step 1: Locate the Backup Archive
+ * The backup ZIP file is automatically saved to your external SD card by the script.
+ * The filename will be in the following format:
+   /external_sd/gpt_partition_backup_YYYYMMDD_HHMMSS.zip
+
+ * Example: gpt_partition_backup_20251115_162600.zip
+ * Ensure your SD card is inserted and accessible in Recovery.
+
+Step 2: Boot into Recovery
+ * Turn off your device.
+ * Boot into your custom recovery (e.g., TWRP or OrangeFox).
+
+Step 3: Flash the Restore Archive
+ * In the recovery main menu, choose "Install."
+ * Navigate to your external SD card and select your gpt_partition_backup_*.zip file.
+ * Swipe to confirm the flash.
+
+Step 4: Restoration Process
+The backup script will perform the following critical operations:
+ * Restore the original GPT partition table.
+ * Restore the original boot partition.
+ * Display the message: "Recovery complete" when finished.
+Step 5: Finish
+ * Once the flash is complete, select "Reboot System."
+ * Your device should now boot with its original partition layout.
+</details>
+<details>
+<summary>Click to expand: Troubleshooting</summary>
+If Something Goes Wrong
+If the archive fails to flash or your device doesn't boot after the process:
+ * Please provide the log file generated by TWRP (or the script itself, which may be found on the SD card).
+ * If possible, capture and provide an ADB log.
+Command to get an ADB log:
+adb logcat > log.txt
+
+</details>
+
+Credits
+ * Thanks to alekseystarikov for testing the archive.
 
 The preloader will be flashed with version 1024
