@@ -2,8 +2,8 @@
 The code was slightly rewritten and a partition backup from boot was added.
 It is now possible to restore the old partition using an archive created by folders.
 /tmp/backup
-/sdcard/gpt_partition_backup_*.zip
-/sdcard/gpt_backup_*.bin
+/external_sd/gpt_partition_backup_*.zip
+/external_sd/gpt_backup_*.bin
 
 # Update version 1.1:
 
